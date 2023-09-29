@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0"><channel><title><![CDATA[Gatsby Starter Blog RSS Feed]]></title><description><![CDATA[Blog personnel de Bryton Lacquement.]]></description><link>https://www.brytonlacquement.com</link><generator>GatsbyJS</generator><lastBuildDate>Fri, 29 Sep 2023 15:17:39 GMT</lastBuildDate><item><title><![CDATA[Construire un environnement de développement réplicable]]></title><description><![CDATA[Dans les systèmes UNIX, la configuration des outils spécifique à l'utilisateur est traditionnellement stockée dans ce que l'on appelle des…]]></description><link>https://www.brytonlacquement.com/construire-un-environnement-de-developpement-replicable/</link><guid isPermaLink="false">https://www.brytonlacquement.com/construire-un-environnement-de-developpement-replicable/</guid><pubDate>Tue, 19 Sep 2023 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;Dans les systèmes UNIX, la configuration des outils spécifique à l&apos;utilisateur est traditionnellement stockée dans ce que l&apos;on appelle des &lt;strong&gt;dotfiles&lt;/strong&gt;
+— littéralement, des fichiers dont le nom est préfixé d&apos;un point.&lt;/p&gt;
+&lt;p&gt;En voici plusieurs exemples concrets :&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th align=&quot;left&quot;&gt;Nom du programme&lt;/th&gt;
+&lt;th align=&quot;left&quot;&gt;Chemin du fichier de configuration&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td align=&quot;left&quot;&gt;bash&lt;/td&gt;
+&lt;td align=&quot;left&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;~/.bashrc&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&quot;left&quot;&gt;git&lt;/td&gt;
+&lt;td align=&quot;left&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;~/.gitconfig&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&quot;left&quot;&gt;tmux&lt;/td&gt;
+&lt;td align=&quot;left&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;~/.tmux.conf&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td align=&quot;left&quot;&gt;vim&lt;/td&gt;
+&lt;td align=&quot;left&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;~/.vimrc&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;Il est courant de traquer l&apos;évolution de ses dotfiles à l&apos;aide d&apos;un système de contrôle de version tel que Git.&lt;/strong&gt;
+C&apos;est à dire : créer un dépôt (souvent public) (avec potentiellement plusieurs branches) dans lequel ces fichiers sont suivis.
+Cela permet de facilement répliquer un environnement d&apos;une machine à l&apos;autre.&lt;/p&gt;
+&lt;p&gt;Différentes approches existent pour maintenir ce dépôt Git :&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Par exemple, il est possible de traquer directement les fichiers dans le répertoire personnel ;&lt;/li&gt;
+&lt;li&gt;Alternativement, il est aussi possible de les stocker dans un sous-répertoire arbitraire et créer un lien symbolique / copier / générer des fichiers avec un script shell ou un &lt;a href=&quot;https://wiki.archlinux.org/title/Dotfiles#Tools&quot;&gt;outil dedié tiers&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Dans la suite de cet article, je vais vous exposer la méthode que j&apos;affectionne et que je trouve élégante : l&apos;utilisation d&apos;un dépôt Git nu.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Pour les néophytes, comme pour les plus accomplis, voici un tableau expliquant brièvement la différence entre dépôt classique et dépôt nu dans Git :&lt;/p&gt;
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;Type de dépôt&lt;/th&gt;
+      &lt;th&gt;Caractéristiques&lt;/th&gt;
+      &lt;th&gt;Schématisation&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;Classique&lt;/td&gt;
+      &lt;td&gt;Un dossier &lt;code class=&quot;language-text&quot;&gt;.git&lt;/code&gt; existe à la racine du dépôt et contient toutes les donnés et métadonnées liés à l&apos;état dudit dépôt.&lt;/td&gt;
+      &lt;td&gt;
+        &lt;pre class=&quot;language-text&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;work_tree/
+├── .git/
+│   └── (data &amp;amp; metadata)
+├── file_1
+├── file_2
+└── file_3&lt;/code&gt;&lt;/pre&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;Nu&lt;br&gt;(&lt;em&gt;bare&lt;/em&gt; en anglais)&lt;/td&gt;
+      &lt;td&gt;La copie de travail (&lt;em&gt;work tree&lt;/em&gt; en anglais) et l&apos;équivalent du &lt;code class=&quot;language-text&quot;&gt;.git&lt;/code&gt; (&lt;em&gt;git dir&lt;/em&gt;) sont stockés dans des répertoires différents.&lt;/td&gt;
+      &lt;td&gt;
+        &lt;pre class=&quot;language-text&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;work_tree/
+├── file_1
+├── file_2
+└── file_3
+&amp;nbsp;
+git_dir/
+└── (data &amp; metadata)&lt;/code&gt;&lt;/pre&gt;
+      &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2&gt;Partir de zéro&lt;/h2&gt;
+&lt;p&gt;La première chose à faire est d&apos;initialiser le dépôt Git nu.
+Le processus à suivre est le suivant.
+Chaque étape est décrite ci-après.&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;bash&quot;&gt;&lt;pre class=&quot;language-bash&quot;&gt;&lt;code class=&quot;language-bash&quot;&gt;&lt;span class=&quot;token comment&quot;&gt;# Define temporary variables&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;export&lt;/span&gt; &lt;span class=&quot;token assign-left variable&quot;&gt;GIT_DIR&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&quot;&lt;span class=&quot;token environment constant&quot;&gt;$HOME&lt;/span&gt;/.dotfiles&quot;&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;export&lt;/span&gt; &lt;span class=&quot;token assign-left variable&quot;&gt;WORK_TREE&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&quot;&lt;span class=&quot;token environment constant&quot;&gt;$HOME&lt;/span&gt;&quot;&lt;/span&gt;
+
+&lt;span class=&quot;token comment&quot;&gt;# Initialize the repository&lt;/span&gt;
+&lt;span class=&quot;token function&quot;&gt;git&lt;/span&gt; init &lt;span class=&quot;token parameter variable&quot;&gt;--bare&lt;/span&gt; &lt;span class=&quot;token string&quot;&gt;&quot;&lt;span class=&quot;token variable&quot;&gt;$GIT_DIR&lt;/span&gt;&quot;&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;alias&lt;/span&gt; &lt;span class=&quot;token assign-left variable&quot;&gt;dotfiles&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&apos;/usr/bin/git --git-dir=&quot;$GIT_DIR&quot; --work-tree=&quot;$WORK_TREE&quot;&apos;&lt;/span&gt;
+dotfiles config &lt;span class=&quot;token parameter variable&quot;&gt;--local&lt;/span&gt; status.showUntrackedFiles no
+
+&lt;span class=&quot;token comment&quot;&gt;# Persist the alias (bash only)&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;echo&lt;/span&gt; &lt;span class=&quot;token string&quot;&gt;&quot;alias dotfiles=&apos;/usr/bin/git --git-dir=&lt;span class=&quot;token entity&quot; title=&quot;\&amp;quot;&quot;&gt;\&quot;&lt;/span&gt;&lt;span class=&quot;token variable&quot;&gt;$GIT_DIR&lt;/span&gt;&lt;span class=&quot;token entity&quot; title=&quot;\&amp;quot;&quot;&gt;\&quot;&lt;/span&gt; --work-tree=&lt;span class=&quot;token entity&quot; title=&quot;\&amp;quot;&quot;&gt;\&quot;&lt;/span&gt;&lt;span class=&quot;token variable&quot;&gt;$WORK_TREE&lt;/span&gt;&lt;span class=&quot;token entity&quot; title=&quot;\&amp;quot;&quot;&gt;\&quot;&lt;/span&gt;&apos;&quot;&lt;/span&gt; &lt;span class=&quot;token operator&quot;&gt;&gt;&gt;&lt;/span&gt; &lt;span class=&quot;token environment constant&quot;&gt;$HOME&lt;/span&gt;/.bashrc&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;ul&gt;
+&lt;li&gt;Premièrement, des variables sont définies par commodité.&lt;/li&gt;
+&lt;li&gt;Ensuite, le dépôt Git nu est initialisé.&lt;/li&gt;
+&lt;li&gt;Après, l&apos;alias &lt;code class=&quot;language-text&quot;&gt;dotfiles&lt;/code&gt; est créé. &lt;strong&gt;Il est à utiliser à la place de la commande &lt;code class=&quot;language-text&quot;&gt;git&lt;/code&gt;.&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;Puis, un flag — local au dépôt — est positionné pour masquer les fichiers qui ne sont pas explicitement suivis. Ainsi, ces fichiers ne sont pas remontés dans la sortie de commandes telles que &lt;code class=&quot;language-text&quot;&gt;dotfiles status&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;Enfin, l&apos;alias est persisté pour une utilisation future.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Après que cette mise en place ai été effectuée, n&apos;importe quel fichier du dossier &lt;code class=&quot;language-text&quot;&gt;$HOME&lt;/code&gt; peut être versionné avec des commandes Git normales, en remplaçant &lt;code class=&quot;language-text&quot;&gt;git&lt;/code&gt; par l&apos;alias &lt;code class=&quot;language-text&quot;&gt;dotfiles&lt;/code&gt; créé précédemment, comme suit :&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;bash&quot;&gt;&lt;pre class=&quot;language-bash&quot;&gt;&lt;code class=&quot;language-bash&quot;&gt;dotfiles &lt;span class=&quot;token function&quot;&gt;add&lt;/span&gt; ~/.bashrc
+dotfiles &lt;span class=&quot;token function&quot;&gt;add&lt;/span&gt; ~/.gitconfig
+dotfiles &lt;span class=&quot;token function&quot;&gt;add&lt;/span&gt; ~/.tmux.conf
+dotfiles &lt;span class=&quot;token function&quot;&gt;add&lt;/span&gt; ~/.vimrc
+dotfiles commit &lt;span class=&quot;token parameter variable&quot;&gt;--message&lt;/span&gt; &lt;span class=&quot;token string&quot;&gt;&quot;Add various files&quot;&lt;/span&gt;
+dotfiles push &lt;span class=&quot;token punctuation&quot;&gt;[&lt;/span&gt;args&lt;span class=&quot;token punctuation&quot;&gt;]&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Déloyer ses dotfiles sur une nouvelle machine&lt;/h2&gt;
+&lt;p&gt;Les instructions à suivre sont sensiblement les mêmes que lors de la création.
+Au lieu d&apos;être initialisé, le dépôt est cloné :&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;bash&quot;&gt;&lt;pre class=&quot;language-bash&quot;&gt;&lt;code class=&quot;language-bash&quot;&gt;&lt;span class=&quot;token comment&quot;&gt;# Define temporary variables&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;export&lt;/span&gt; &lt;span class=&quot;token assign-left variable&quot;&gt;GIT_DIR&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&quot;&lt;span class=&quot;token environment constant&quot;&gt;$HOME&lt;/span&gt;/.dotfiles&quot;&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;export&lt;/span&gt; &lt;span class=&quot;token assign-left variable&quot;&gt;WORK_TREE&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&quot;&lt;span class=&quot;token environment constant&quot;&gt;$HOME&lt;/span&gt;&quot;&lt;/span&gt;
+
+&lt;span class=&quot;token comment&quot;&gt;# Clone the repository&lt;/span&gt;
+&lt;span class=&quot;token function&quot;&gt;git&lt;/span&gt; clone &lt;span class=&quot;token parameter variable&quot;&gt;--bare&lt;/span&gt; &lt;span class=&quot;token operator&quot;&gt;&amp;lt;&lt;/span&gt;repository&lt;span class=&quot;token operator&quot;&gt;&gt;&lt;/span&gt; &lt;span class=&quot;token string&quot;&gt;&quot;&lt;span class=&quot;token variable&quot;&gt;$GIT_DIR&lt;/span&gt;&quot;&lt;/span&gt;
+&lt;span class=&quot;token builtin class-name&quot;&gt;alias&lt;/span&gt; &lt;span class=&quot;token assign-left variable&quot;&gt;dotfiles&lt;/span&gt;&lt;span class=&quot;token operator&quot;&gt;=&lt;/span&gt;&lt;span class=&quot;token string&quot;&gt;&apos;/usr/bin/git --git-dir=&quot;$GIT_DIR&quot; --work-tree=&quot;$WORK_TREE&quot;&apos;&lt;/span&gt;
+dotfiles checkout &lt;span class=&quot;token operator&quot;&gt;&amp;lt;&lt;/span&gt;branch&lt;span class=&quot;token operator&quot;&gt;&gt;&lt;/span&gt; &lt;span class=&quot;token parameter variable&quot;&gt;-f&lt;/span&gt;
+dotfiles config &lt;span class=&quot;token parameter variable&quot;&gt;--local&lt;/span&gt; status.showUntrackedFiles no&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Comme énoncé précédemment, d&apos;autres méthodes de synchronisation existent.
+En tout cas, &lt;strong&gt;je vous encourage à traquer vos dotfiles&lt;/strong&gt; en utilisant celle qui vous convient le mieux.&lt;/p&gt;
+&lt;p&gt;Pour les curieux, &lt;a href=&quot;https://github.com/lebriton/dotfiles&quot;&gt;mes dotfiles sont publics&lt;/a&gt;.&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Mes outils de développement]]></title><description><![CDATA[Au fil des années, j'ai assemblé et peaufinné un workflow dont je suis enfin satisfait.
+Il y a eu beaucoup d'essais, d'erreurs, d'abandons…]]></description><link>https://www.brytonlacquement.com/mes-outils-de-developpement/</link><guid isPermaLink="false">https://www.brytonlacquement.com/mes-outils-de-developpement/</guid><pubDate>Tue, 15 Aug 2023 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;Au fil des années, j&apos;ai assemblé et peaufinné un workflow dont je suis enfin satisfait.
+Il y a eu beaucoup &lt;strong&gt;d&apos;essais&lt;/strong&gt;, &lt;strong&gt;d&apos;erreurs&lt;/strong&gt;, &lt;strong&gt;d&apos;abandons&lt;/strong&gt;, de &lt;strong&gt;réadoptions&lt;/strong&gt;.
+Bref, cela a été &lt;strong&gt;un long processus itératif&lt;/strong&gt; pour trouver ce qui me convient le mieux.
+Aujourd&apos;hui, ce workflow est composé des outils principaux suivants :&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;bash&lt;/strong&gt; ;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;tmux&lt;/strong&gt; ;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;VSCodium&lt;/strong&gt; (+ extension &lt;strong&gt;Vim&lt;/strong&gt;).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;En assemblant tous ces composants, je peux être productif et travailler confortablement.
+Je vous propose d&apos;explorer plus en détail mon workflow dans la suite de cet article.&lt;/p&gt;
+&lt;h2&gt;Contexte et besoins&lt;/h2&gt;
+&lt;p&gt;Commençons d&apos;abord par me présenter et exposer mes besoins.
+Je suis un développeur travaillant dans des environnements Linux.
+Je suis souvent amené à éditer du code et invoquer diverses commandes.
+En simplifiant au maximum, j&apos;ai principalement besoin des éléments suivants sur ma machine lorsque je travaille :&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Un terminal (avec un shell)&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Un éditeur de texte / IDE&lt;/strong&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2&gt;Mes outils&lt;/h2&gt;
+&lt;p&gt;Dans cette section, je présente chaque outil (&lt;strong&gt;Quoi&lt;/strong&gt;), &lt;strong&gt;Pourquoi&lt;/strong&gt; je l&apos;utilise et &lt;strong&gt;Pourquoi&lt;/strong&gt; je n&apos;utilise &lt;strong&gt;pas&lt;/strong&gt; une alternative populaire.&lt;/p&gt;
+&lt;h3&gt;1. bash&lt;/h3&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/30e827b5fc6a5490c729c3081c8be820/d9217/bash-example.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 62.65822784810127%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAANCAIAAAAmMtkJAAAACXBIWXMAAC4jAAAuIwF4pT92AAACu0lEQVR42hXNzW/bVAAAcP8XSAyapC2xnx2/+Nvvy/bz98ucpHHsdM2yZku3qew04MaJE9y4cN9p0jSJQkuaThnbEFf+KzTpd/9Jf23fXd1+vNl9vN59uL79+7Pt/nq7v7q5e/3m95vru912/+72/d32/e12/+fun6vdp7d/7P/99OG/Vz9L86ZtF6er9fri8vnFi8vHz5+dPVq1i0XTtHU9X52fb549fXyxWW+erDeb0+Wyadq2bWfN4mUrpN7hse66EGNR5WJSoDiMc65bZqfTPTjoDIbQtQ3q275j+J5lWoZlGZYJO52DhQckFIWLs7qaVWIi6mayPDt58qgOyxxHoQpUEnMSBjwgWRwEAWEBNW3LNoeaqi7ZUCJZOpndb5qKZinNsyhP2qaaN1UssoEOSRiwhDOKeEBiHjiObZpGSNwhHCypLpUT8fBhnYicFVkkCpplcZlOT0QsMst1UUDjJKIMU+xFITEgtEwjxDYcaDWFUj7K5804HRWsyMKyIFma3i/m7SQWheW5PiU8YgHxsO/YluG7lueYnLgGHHRVR8JZMp2PZ3WFszQUZTYezZvq5POcQ8PwGaE8YoxkSUCQGzLMkB0iB+raFyqVSMLFWPAiG9fVfDFdr+q2HaM0wTwCCsABi5KQcRZGbFTwOCJZ6HPqua6jOUjSIPR4TPK8XUzFZJSIvBwLFEcahHJfsTGCHrJdFAUE+Q7BKAoQ9R1oWg+4IfVlRdWhhRDiEU4TP4oMzwe6LivqMVBL1/+11H776ejl96sfNi9+/OXbqkgPD4+P+soZMSSgAgWAvqwoqqaoGlBVWVYUBQAA+oqcY3wZDy/P5QeL4nR6cv50xgPc7/cPZXCKDcnHBBHq+MRFFNq+x8Jj1ejKsKcMu5p7D1hf9sDX95TuwVGv0+t9dSR/owwHOh2C70r3f9V11+048k52AAAAAElFTkSuQmCC&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;bash example&quot;
+        title=&quot;&quot;
+        src=&quot;/static/30e827b5fc6a5490c729c3081c8be820/f058b/bash-example.png&quot;
+        srcset=&quot;/static/30e827b5fc6a5490c729c3081c8be820/c26ae/bash-example.png 158w,
+/static/30e827b5fc6a5490c729c3081c8be820/6bdcf/bash-example.png 315w,
+/static/30e827b5fc6a5490c729c3081c8be820/f058b/bash-example.png 630w,
+/static/30e827b5fc6a5490c729c3081c8be820/d9217/bash-example.png 904w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+        decoding=&quot;async&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Quoi&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Bash&lt;/strong&gt; est un shell UNIX conforme à Posix. Rien de spécial à ajouter.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;J&apos;ai choisi bash par absence d&apos;une alternative convaincante.
+Cf. la section suivante.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi pas zsh, fish, etc.&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;Bash est le shell par défaut sur bon nombre de distributions Linux.
+D&apos;ailleurs, la plupart des scripts shell que l&apos;on trouve sont en fait des scripts bash.
+J&apos;utilise donc bash pour sa pérrenité et son ubiquité.
+J&apos;ai déjà essayé des shells alternatifs mais aucun ne propose de fonctionnalités primordiales justifiant un changement permanent.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;2. tmux&lt;/h3&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/e8d38097baca347de81f330857dbba9a/d9217/tmux-example.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 62.65822784810127%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAANCAIAAAAmMtkJAAAACXBIWXMAAC4jAAAuIwF4pT92AAACbElEQVR42jWR2W4TQRBF5yt4InaAeHrfprun27PYjsmCBFjBO4QEGcWQwDvvfAB/gcSaYMdZDEYQ/gyNCa370CXVVd06FXyeLY4vfk2+/5nMr75d/p6c/5ycLabni08nZ+8/fP1yMptML06n89l0Pjudz6aX09ni4+TH8fnVm7fvgv29ndFo7+jwYHwwGo+fvzoa//uPRvsvX4z6/UG31+9ev1632+sU6rY6/cPeViBU2ViZZS7PXJa5KJJZEhsthKCUIABCBMLySqlcKpdLq+XS6kr5Vnn19o2bq22HAp+I5nq+tbm+uVG/t91M02q9ntbrqeACY0Ipo4RghDHCCCIIMUBFeQfgx5kIrAt9Yuv1LM+Tu81anic2tlubjTRxhFAlBWcUArh0XgsBuAbgMBGBUkxGSunIWJMk3vnYubiaOGO0UlIpaSJFMSk8/4UhCiF8mojAO2tj66suzaobGw0bW0I55ZxxTggllHHG8HJgBWIAMQQQI8QQaDgdxFZ7H8fOKh35qjfGMCGZEIxzbSKppBRCSaGUklGklLQ6iqTgGFBqAudMMXnpr9VS54rYSeIJZYQxsgRGCEWEE1rUlDFEeAiRplGQJq5add7H9VraaOTVxKepL4KYSFttveFCrAFcgRQACAEIAQ4RBRBaYQNrhbU6djZNnPeFjC2ycK2009IogGml6MZL1gghtDwbENwGUsJICVdQlcZoF5soUtZqIbgudpSYsoIfJQSGuICOMEIVALdTHbQftboP77/W+llzvbXT6rV3hv3OoNce9ruDQWc47A2fDHaH7d1Oi7icukxro7Uh0hw+SP8CwfjB7iXNZk0AAAAASUVORK5CYII=&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;tmux example&quot;
+        title=&quot;&quot;
+        src=&quot;/static/e8d38097baca347de81f330857dbba9a/f058b/tmux-example.png&quot;
+        srcset=&quot;/static/e8d38097baca347de81f330857dbba9a/c26ae/tmux-example.png 158w,
+/static/e8d38097baca347de81f330857dbba9a/6bdcf/tmux-example.png 315w,
+/static/e8d38097baca347de81f330857dbba9a/f058b/tmux-example.png 630w,
+/static/e8d38097baca347de81f330857dbba9a/d9217/tmux-example.png 904w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+        decoding=&quot;async&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Quoi&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Tmux&lt;/strong&gt; est un multiplexeur de terminaux.
+Il permet l&apos;utilisation de plusieurs terminaux virtuels dans une seule fenêtre de terminal.
+Tmux propose aussi un système de sessions, lesquelles peuvent être détachées et continuent de fonctionner en arrière-plan.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;Tmux permet de créer des sessions de travail. Ces dernières ont deux avantages principaux :&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;a.&lt;/strong&gt; &lt;strong&gt;Gestion des fenêtres et panneaux&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Pour illustrer ce point, prenons l&apos;exemple d&apos;un projet nécessitant d&apos;exécuter divers processus en parallèle :&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Un serveur frontend ;&lt;/li&gt;
+&lt;li&gt;Un serveur backend / API ;&lt;/li&gt;
+&lt;li&gt;Git (pour traquer le code source).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Au lieu d&apos;ouvrir un terminal par processus, une session tmux peut être utilisée.
+Lesdits processus peuvent être invoqués dans une même session et être arrangés en fenêtres et/ou panneaux, selon les préférences.&lt;/p&gt;
+&lt;p&gt;Si le besoin éphémère de changer de contexte survient, la session peut simplement être détachée et la tâche annexe effectuée.
+La session peut par la suite être réattachée afin de reprendre le travail.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;b.&lt;/strong&gt; &lt;strong&gt;La persistance&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Cette caractéristique est très intéressante dans le cas des machines distantes auxquelles on se connecte via SSH.
+En effet, lors d&apos;une connexion SSH standard, si l&apos;on vient à être deconnecté — un problème réseau par exemple —, le processus en cours d&apos;exécution est tué.&lt;/p&gt;
+&lt;p&gt;Dans le cas d&apos;une session tmux, cette dernière est tout simplement détachée et le(s) processus continue(nt) en fond.
+Il est possible de réattacher la session par la suite lors de la reconnexion SSH.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi pas GNU Screen&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;Selon moi, tmux est plus simple à prendre en main, autant au niveau de sa configuration que de sa scriptabilité.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3&gt;3. VSCodium (+ extension Vim)&lt;/h3&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/fa775205050a4c79c96c85eea1759bc0/7ebf9/vscodium-example.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 56.32911392405063%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAALCAIAAADwazoUAAAACXBIWXMAABP+AAAT/gEHlDmEAAABoklEQVR42j2R63KbMBCFeRQb10h70w2BhEnTpK+aYIztdJo+YUcQZ+f80u450n6qpvN8XS7TeX57n97ep3meb7frZVnmuRze77eP+/L59+Pf55/7/TbPl2VZluv1PF+m6VwBgjjbNPvdfrfb7ep6z6hbB6CVUpqFhRWhYlLN8Udd14dDfagPSh1Bq4rZxNMwZPCejJAICWH2xEzGiDAxs0iREYG1lNIx2CHFSgPEYUyds4a3aULoHHkrzMxERSWCAECv1TQqBvc8pgqIQ58JvxqgNSH2wQx9iN7I6i4ZhGWNhzl403e+UlqnrvVOvnvMNHYmtzJE07U2eNt6651dk1CEj03TepP7UGnAPGTD1DTFXCAR/fqZX1/G3y/j81MeUhxSG1sf/BrUOiwFzFQppVJ0XfRMuN3sHSTPTpiQqIwBaEAEQlwFtH2FUpUCTLnPfaDVDFCwP3X2tbfJExVMgA9BgQKrNCBUoCGfRmflG6YQDlGsoVCYs/n6J96YGwZB3RRCqopDPqW2NB7PRoDOohfyhnuHwRvv7LaAMeIMG8aN/3+/qJBLUJfGzQAAAABJRU5ErkJggg==&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;vscodium example&quot;
+        title=&quot;&quot;
+        src=&quot;/static/fa775205050a4c79c96c85eea1759bc0/f058b/vscodium-example.png&quot;
+        srcset=&quot;/static/fa775205050a4c79c96c85eea1759bc0/c26ae/vscodium-example.png 158w,
+/static/fa775205050a4c79c96c85eea1759bc0/6bdcf/vscodium-example.png 315w,
+/static/fa775205050a4c79c96c85eea1759bc0/f058b/vscodium-example.png 630w,
+/static/fa775205050a4c79c96c85eea1759bc0/40601/vscodium-example.png 945w,
+/static/fa775205050a4c79c96c85eea1759bc0/78612/vscodium-example.png 1260w,
+/static/fa775205050a4c79c96c85eea1759bc0/7ebf9/vscodium-example.png 1919w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+        decoding=&quot;async&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Quoi&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;Cette partie est un peu plus complexe à décrire. Pour comprendre, il faut parler de &lt;strong&gt;VSCode&lt;/strong&gt;, &lt;strong&gt;VSCodium&lt;/strong&gt;, &lt;strong&gt;Vim&lt;/strong&gt; et &lt;strong&gt;VSCodeVim&lt;/strong&gt; ; décomposons...&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;a.&lt;/strong&gt; &lt;strong&gt;VSCode&lt;/strong&gt;, ou Visual Studio Code, est un IDE et éditeur de code, développé par Microsoft.
+C&apos;est un des IDE modernes les plus populaires à travers le monde et il dispose d&apos;un large panel d&apos;extensions.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;b.&lt;/strong&gt; &lt;strong&gt;VSCodium&lt;/strong&gt; est une distribution de VSCode exemptée de la télémétrie et la marque Microsoft.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;c.&lt;/strong&gt; &lt;strong&gt;Vim&lt;/strong&gt; est un éditeur de texte extrêmement personnalisable fonctionnant dans le terminal.
+Il existe depuis plus de trois décennies maintenant — plus de quatres si on compte son ancêtre Vi.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;d.&lt;/strong&gt; &lt;strong&gt;&lt;a href=&quot;https://github.com/VSCodeVim/Vim&quot;&gt;VSCodeVim&lt;/a&gt;&lt;/strong&gt; est une extension permettant d&apos;introduire le comportement de Vim dans VSCode / VSCodium.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi Vim (en tant que concept)&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/060839b916ab3a39ec7f5b2aaa605e47/d9217/vim-example.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 62.65822784810127%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAANCAIAAAAmMtkJAAAACXBIWXMAAC4jAAAuIwF4pT92AAACTElEQVR42k1RyW4TQRCdz+CSWWzPdFf3dPcsvc9ii4jtFuJxBPwE/ASfwQkJDoQYb4ohROLKX6FxkKBUh1LXe6p+7wWb7eHL7u7b4ed6f7fe/Rh7e7zZHr+uDx8/Xa/Xh/3mdr857rffd5vbm9399f7+8/Xx1/3d7w/vg5eXy8thWA6rf736O1yMu+VyOQzDavgPMAzDxXL1dngeRFESxtMwnoRxEkZJGMVhFM9m0ziOszTFWTpNJlEYRWEURvFZlJyFSRQlcRyuNAQYCCYMkxyTHAFFmGAgVVVqXVstnVF1VaAMAwaEKYIRQyklBF63IkAYHp4yTEQhpKy8033nnpx3L54uzhfNvHNW1YJzmrMMAcLAKAHAb1o+kjOgJzKljIuysEZZI51VfWsbq7xVVkvOGRD68AWRA2B82fIgwyDKinHBhdBazXsvjS6VLMuibUzfOqelN8oZWRWCwEgrKFCCE6pGsvO2lnWtlNAmLyuSM8IYItSZ8WZj1YOWeWvLQghGBQEC+BFpghTBfNEZo31jTeNLYyol86rCTPSta0/6ldF97xed61v7uFG6EmmGqXRBhgBThkjOuGCc13Xddl57W2ulVV2VQhttnKmKouCccZFTwnOapHA1L05uY5oi0rReamWd6TrfdI32jteSFpX1rvG286bvXFHLGQIKMEPwyhcBHmsMAI+ejyFjIEBOssYgSEYonHzCJwycKsnwlSuCaZZPUjbJWJKyGPEYiThjMeYJFhGVMVVpCjhFkALJgGKSA+U0bwS8e6b+AANStfRwiUxCAAAAAElFTkSuQmCC&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;vim example&quot;
+        title=&quot;&quot;
+        src=&quot;/static/060839b916ab3a39ec7f5b2aaa605e47/f058b/vim-example.png&quot;
+        srcset=&quot;/static/060839b916ab3a39ec7f5b2aaa605e47/c26ae/vim-example.png 158w,
+/static/060839b916ab3a39ec7f5b2aaa605e47/6bdcf/vim-example.png 315w,
+/static/060839b916ab3a39ec7f5b2aaa605e47/f058b/vim-example.png 630w,
+/static/060839b916ab3a39ec7f5b2aaa605e47/d9217/vim-example.png 904w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+        decoding=&quot;async&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;De premier abord, Vim (et tout ce qu&apos;il représente) peut paraître ancien, obsolète et inadapté au développement moderne ; pourtant il est très pertinent.&lt;/p&gt;
+&lt;p&gt;Vim se différencie par son paradigme innovant : &lt;a href=&quot;https://fr.wikipedia.org/wiki/Vim#Modes&quot;&gt;le fonctionnement modal&lt;/a&gt; ; ce qui pose bien souvent des problèmes aux débutants.
+&lt;strong&gt;C&apos;est cependant ce qui en fait toute sa force.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Vim possède son propre &lt;em&gt;langage de touches&lt;/em&gt;, à savoir une langue avec une grammaire et un vocabulaire propres.
+Dans le mode &quot;NORMAL&quot; (le mode par défaut lorsque Vim est ouvert), il n&apos;est pas possible d&apos;écrire du texte.
+C&apos;est dans le mode &quot;INSERTION&quot; que l&apos;on peut faire cela, comme dans un éditeur classique.
+En revanche, le mode &quot;NORMAL&quot; permet de naviguer dans le document et de manipuler son texte.&lt;/p&gt;
+&lt;p&gt;On peut par exemple &lt;a href=&quot;https://blog.flozz.fr/2019/11/18/pourquoi-jutilise-vim-et-pourquoi-vous-ne-devriez-pas-lutiliser/#vim-une-langue-avec-sa-grammaire-et-son-vocabulaire&quot;&gt;supprimer tout un paragraphe&lt;/a&gt; (par rapport à la position du curseur) à l&apos;aide du raccourci &lt;code class=&quot;language-text&quot;&gt;dip&lt;/code&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code class=&quot;language-text&quot;&gt;d&lt;/code&gt; est le verbe d&apos;action et signifie &quot;&lt;em&gt;delete&lt;/em&gt;&quot; (supprimer) ;&lt;/li&gt;
+&lt;li&gt;&lt;code class=&quot;language-text&quot;&gt;i&lt;/code&gt; est un modificateur qui signifie &quot;&lt;em&gt;inside&lt;/em&gt;&quot; (dedans, à l&apos;intérieur). Il permet de préciser ce qui suit.&lt;/li&gt;
+&lt;li&gt;&lt;code class=&quot;language-text&quot;&gt;p&lt;/code&gt; est le sujet et signifie &quot;&lt;em&gt;paragraph&lt;/em&gt;&quot; (paragraphe 🙃).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;La phrase suivante est donc construite : &quot;&lt;em&gt;delete inside paragraph&lt;/em&gt;&quot;, soit &quot;supprimer l&apos;intérieur du paragraphe&quot;. Et cela n&apos;est qu&apos;un exemple parmis tant d&apos;autres.&lt;/p&gt;
+&lt;p&gt;Avec le temps, la mémoire musculaire se développe, au point de pouvoir naviguer et éditer le code à la vitesse de la lumière.
+L&apos;effort cognitif à fournir entre la pensée et l&apos;action devient quasiment nul.&lt;/p&gt;
+&lt;p&gt;De plus, les touches Vim sont répandues dans de nombreux autres outils.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi Vim dans un IDE (et pourquoi pas autre chose)&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;Cela fait maintenant un bon nombre d&apos;années que j&apos;utilise Vim.
+Avec le temps et l&apos;expérience, il m&apos;est devenu compliqué d&apos;utiliser un autre éditeur de texte.
+J&apos;affectionne énormément le fonctionnement modal que Vim propose et les gains de productivité qui en découlent.&lt;/p&gt;
+&lt;p&gt;Pendant longtemps, j&apos;ai utilisé Vim exclusivement via sa forme terminal.
+Cela signifie : passer un bon paquet de temps à le peaufinner afin qu&apos;il me corresponde en tout point.
+Au bout d&apos;un temps, l&apos;effort à fournir est devenu trop élevé par rapport au gain constaté.
+En fait, la complexité réside dans le fait de maintenir une configuration homogène, cohèrente et intuitive.&lt;/p&gt;
+&lt;p&gt;Lassé de cette expérience, j&apos;ai opté pour le choix suivant : &lt;strong&gt;utiliser un IDE moderne enrichi du comportement modal de Vim&lt;/strong&gt;.
+Cela permet de combiner — à mon sens — le meilleur des deux mondes : intuitivité (grâce à l&apos;IDE) et boost de productivité (grâce à Vim).&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Pourquoi VSCode / VSCodium&lt;/strong&gt; :&lt;/p&gt;
+&lt;p&gt;Il n&apos;y a pas de raisons particulières qui m&apos;ont poussées à choisir VSCode / VSCodium plutôt qu&apos;un autre IDE.
+J&apos;ai simplement accroché au design et à la facilité de prise en main.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Dotfiles&lt;/h2&gt;
+&lt;p&gt;Les outils cités à travers ce post sont configurables via des fichiers de configuration, aussi appelés &lt;strong&gt;dotfiles&lt;/strong&gt; — simplement parce que leur nom est souvent préfixé d&apos;un point.
+J&apos;utilise un &lt;a href=&quot;https://github.com/lebriton/dotfiles&quot;&gt;dépôt Git&lt;/a&gt; pour &lt;a href=&quot;/construire-un-environnement-de-developpement-replicable/&quot;&gt;traquer et synchroniser mes dotfiles à travers mes différentes machines&lt;/a&gt;.
+Cette approche a deux avantages :&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Versionner les fichiers et ainsi garder une trace de leur évolution ;&lt;/li&gt;
+&lt;li&gt;Offrir un environnement de travail consistant et facilement réplicable.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2&gt;Prévenir des douleurs articulo-musculaires&lt;/h2&gt;
+&lt;p&gt;En parallèle de ce peaufinnement de workflow, &lt;strong&gt;j&apos;ai fait l&apos;acquisition d&apos;un clavier mécanique ortholinéaire — &lt;a href=&quot;https://ergodox-ez.com/pages/planck&quot;&gt;le Planck EZ&lt;/a&gt;&lt;/strong&gt;.
+Bien que ce clavier soit très onéreux, je pense honnêtement que &lt;strong&gt;c&apos;est mon meilleur investissement depuis longtemps&lt;/strong&gt;.
+Ce dernier m&apos;a forcé à apprendre à taper au clavier correctement en utilisant chaque doigt des deux mains.&lt;/p&gt;
+&lt;p&gt;&lt;span
+      class=&quot;gatsby-resp-image-wrapper&quot;
+      style=&quot;position: relative; display: block; margin-left: auto; margin-right: auto; max-width: 630px; &quot;
+    &gt;
+      &lt;a
+    class=&quot;gatsby-resp-image-link&quot;
+    href=&quot;/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/8b70b/planckez.png&quot;
+    style=&quot;display: block&quot;
+    target=&quot;_blank&quot;
+    rel=&quot;noopener&quot;
+  &gt;
+    &lt;span
+    class=&quot;gatsby-resp-image-background-image&quot;
+    style=&quot;padding-bottom: 29.746835443037973%; position: relative; bottom: 0; left: 0; background-image: url(&apos;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAGCAYAAADDl76dAAAACXBIWXMAAAsTAAALEwEAmpwYAAABO0lEQVR42m2OO07DQBCG9wQUnCV2/FzvI1l7vcnaLnIDS2lzBWhRKo4QCVFBGkRNSx1ClyZ3AGlFvGhGgFJQfPq/mdHODiGEkK7r7owxB2vtvuu6fdu2b23bvv/4DhxomgbdWgvsmqbZz2Yz4LBYLO5hF9lsNhfGmGMYhj6O41OWZZA+TVMPniQJep7n6JDQj6II+1EUDfBWKXVcr9eXZLVaCcYYDoIgGLIsG8bj8QA1pRRzOp0OSil0xhjOgTRNh9FoBH6ilHrYRfq+v4JCSvmRJIkTQriiKByl1CmlMJfLJZLnuSvLEhP6UkoXx7HjnH/C5X3fX5P5fP5aFIXnnJ/gUiHEH5xz+MjLifRSTtDPZwC8ZYx9QWqtX4i19lZr/VTX9aMxZqu13kKee1VVyG/vHx6qqno2xtx8Azbmx+dknyoOAAAAAElFTkSuQmCC&apos;); background-size: cover; display: block;&quot;
+  &gt;&lt;/span&gt;
+  &lt;img
+        class=&quot;gatsby-resp-image-image&quot;
+        alt=&quot;planckez&quot;
+        title=&quot;&quot;
+        src=&quot;/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/f058b/planckez.png&quot;
+        srcset=&quot;/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/c26ae/planckez.png 158w,
+/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/6bdcf/planckez.png 315w,
+/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/f058b/planckez.png 630w,
+/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/40601/planckez.png 945w,
+/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/78612/planckez.png 1260w,
+/static/92daf7b99f3d3d30d6d6a0b1b5fe4242/8b70b/planckez.png 1266w&quot;
+        sizes=&quot;(max-width: 630px) 100vw, 630px&quot;
+        style=&quot;width:100%;height:100%;margin:0;vertical-align:middle;position:absolute;top:0;left:0;&quot;
+        loading=&quot;lazy&quot;
+        decoding=&quot;async&quot;
+      /&gt;
+  &lt;/a&gt;
+    &lt;/span&gt;&lt;/p&gt;
+&lt;p&gt;Avant cet achat, je souffrais de douleurs non négligeables au niveau des avant-bras et des poignets, causées par des mouvements répétitifs parasites.
+Ces douleurs pouvaient être aiguës, au point de m&apos;empêcher de travailler.&lt;/p&gt;
+&lt;p&gt;Depuis que j&apos;ai appris à correctement taper au clavier, mes mouvements de bras et de mains sont réduits au minimum.
+En plus, l&apos;utilisation de la souris est presque absente de mon workflow ; j&apos;ai défini tout un tas de raccouris claviers.
+Cela minimise encore plus les mouvements parasites et conduit à prévenir la douleur.&lt;/p&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Les outils et leur configuration relèvent de l&apos;appréciation personnelle — &lt;em&gt;les goûts et les couleurs…&lt;/em&gt;.
+Un workflow donné ne peut pas correspondre à tout le monde ; c&apos;est un long processus itératif et personnel.&lt;/p&gt;
+&lt;p&gt;Les connaissances que j&apos;ai regroupées ici vous seront peut-être bénéfiques — ou peut-être pas.
+Je vous encourage à vous pencher sur la question et partager vos découvertes.&lt;/p&gt;</content:encoded></item><item><title><![CDATA[Rectifier un commit Git fautif sur une branche stable]]></title><description><![CDATA[Lors du développement, il arrive qu'on applique un commit contenant une coquille.
+La plupart du temps, quand je travaille sur une branche de…]]></description><link>https://www.brytonlacquement.com/rectifier-un-commit-git-fautif-sur-une-branche-stable/</link><guid isPermaLink="false">https://www.brytonlacquement.com/rectifier-un-commit-git-fautif-sur-une-branche-stable/</guid><pubDate>Fri, 25 Dec 2020 00:00:00 GMT</pubDate><content:encoded>&lt;p&gt;Lors du développement, il arrive qu&apos;on applique un commit contenant une coquille.
+La plupart du temps, quand je travaille sur une branche de fonctionnalités, j&apos;aime bien corriger cette coquille avec un rebasage interactif, c.-à-d. &lt;code class=&quot;language-text&quot;&gt;git rebase --interactive [options]&lt;/code&gt;.
+Cependant, si cette coquille a déjà été appliquée sur une branche stable, il faut trouver un autre moyen — sans rebasage interactif — car l&apos;historique des commits ne doit pas être réécrit.
+La solution la plus évidente est la création d&apos;un nouveau commit, lequel vient corriger ladite coquille.
+Ce commit sera par la suite appliqué sur la branche stable.&lt;/p&gt;
+&lt;p&gt;Pour créer ce commit, j&apos;aime bien utiliser &lt;code class=&quot;language-text&quot;&gt;commit --fixup&lt;/code&gt;.&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;man&quot;&gt;&lt;pre class=&quot;language-man&quot;&gt;&lt;code class=&quot;language-man&quot;&gt;       --fixup=&amp;lt;commit&amp;gt;
+           Construct a commit message for use with rebase --autosquash. The
+           commit message will be the subject line from the specified commit
+           with a prefix of &amp;quot;fixup! &amp;quot;. See git-rebase(1) for details.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Comme décrit dans sa documentation, &lt;code class=&quot;language-text&quot;&gt;commit --fixup&lt;/code&gt; est supposé être utilisé en tandem avec &lt;code class=&quot;language-text&quot;&gt;rebase --autosquash&lt;/code&gt;.
+Dans notre situation, c&apos;est hors sujet.&lt;/p&gt;
+&lt;p&gt;L&apos;avantage de &lt;code class=&quot;language-text&quot;&gt;commit --fixup&lt;/code&gt; est le suivant : le titre du commit à réparer est automatiquement réferencé dans le titre du commit réparant.
+Cela simplifie tout le travail d&apos;archéologie quand il s&apos;agit de comprendre des changements introduits dans une base de code.&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;bash&quot;&gt;&lt;pre class=&quot;language-bash&quot;&gt;&lt;code class=&quot;language-bash&quot;&gt;$ &lt;span class=&quot;token function&quot;&gt;git&lt;/span&gt; log &lt;span class=&quot;token parameter variable&quot;&gt;--oneline&lt;/span&gt;
+* zzzzzzz some noise
+* yyyyyyy fixup&lt;span class=&quot;token operator&quot;&gt;!&lt;/span&gt; This commit contains a typo
+&lt;span class=&quot;token punctuation&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;token punctuation&quot;&gt;..&lt;/span&gt;.&lt;span class=&quot;token punctuation&quot;&gt;]&lt;/span&gt;
+* ddddddd even &lt;span class=&quot;token function&quot;&gt;more&lt;/span&gt; noise
+* ccccccc &lt;span class=&quot;token function&quot;&gt;more&lt;/span&gt; noise
+* bbbbbbb noise
+* aaaaaaa This commit contains a typo&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Cette fonctionnalité peut être améliorée en ajoutant le hash du commit réparé dans le corps du message du commit réparant. Ce comportement est similaire à celui de &lt;code class=&quot;language-text&quot;&gt;git revert&lt;/code&gt;.&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;text&quot;&gt;&lt;pre class=&quot;language-text&quot;&gt;&lt;code class=&quot;language-text&quot;&gt;fixup! This commit contains a typo
+
+This fixes commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Afin de simplifier tout ce processus, j&apos;ai écrit un alias Git :&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;git&quot;&gt;&lt;pre class=&quot;language-git&quot;&gt;&lt;code class=&quot;language-git&quot;&gt;&lt;span class=&quot;token comment&quot;&gt;# ~/.gitconfig&lt;/span&gt;
+[alias]
+    fixup = !sh -c &lt;span class=&quot;token string&quot;&gt;&apos;git commit -m \&quot;This fixes commit $(git rev-parse $1).\&quot; --fixup \&quot;$@\&quot;&apos;&lt;/span&gt; -&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Vous pouvez probablement comprendre le fonctionnement de l&apos;alias par vous même.
+La seule subtilité est qu&apos;un shell est invoqué afin d&apos;appeler &lt;code class=&quot;language-text&quot;&gt;git rev-parse&lt;/code&gt;.
+De cette manière, n&apos;importe quel type de révision peut être fourni à la commande &lt;code class=&quot;language-text&quot;&gt;git fixup&lt;/code&gt;, p. ex. :&lt;/p&gt;
+&lt;div class=&quot;gatsby-highlight&quot; data-language=&quot;bash&quot;&gt;&lt;pre class=&quot;language-bash&quot;&gt;&lt;code class=&quot;language-bash&quot;&gt;$ &lt;span class=&quot;token function&quot;&gt;git&lt;/span&gt; fixup zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz &lt;span class=&quot;token punctuation&quot;&gt;[&lt;/span&gt;options&lt;span class=&quot;token punctuation&quot;&gt;]&lt;/span&gt;  &lt;span class=&quot;token comment&quot;&gt;# hash long (40 caractères)&lt;/span&gt;
+&lt;span class=&quot;token comment&quot;&gt;# ou bien&lt;/span&gt;
+$ &lt;span class=&quot;token function&quot;&gt;git&lt;/span&gt; fixup zzzzzzz &lt;span class=&quot;token punctuation&quot;&gt;[&lt;/span&gt;options&lt;span class=&quot;token punctuation&quot;&gt;]&lt;/span&gt;  &lt;span class=&quot;token comment&quot;&gt;# hash court (7 caractères)&lt;/span&gt;
+&lt;span class=&quot;token comment&quot;&gt;# ou bien&lt;/span&gt;
+$ &lt;span class=&quot;token function&quot;&gt;git&lt;/span&gt; fixup HEAD~42 &lt;span class=&quot;token punctuation&quot;&gt;[&lt;/span&gt;options&lt;span class=&quot;token punctuation&quot;&gt;]&lt;/span&gt;  &lt;span class=&quot;token comment&quot;&gt;# spécificateur plus complexe&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2&gt;Conclusion&lt;/h2&gt;
+&lt;p&gt;Copiez-collez cet alias ; faites-en ce que vous voulez.
+C&apos;est mon cadeau de Noël.&lt;/p&gt;
+&lt;p&gt;Toute ma configuration Git est trouvable &lt;a href=&quot;https://github.com/lebriton/dotfiles/blob/main/.gitconfig&quot;&gt;ici&lt;/a&gt; — avec entre autres, l&apos;énumération de mes alias personnels.&lt;/p&gt;</content:encoded></item></channel></rss>
